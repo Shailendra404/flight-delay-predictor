@@ -1,16 +1,9 @@
-# Flight Delay Predictor
+Open Flight tracker.ipynb in Google Colab
+Mount Google Drive and run all cells
+Run the Flask server cell — it starts on localhost:5000
+Run the Cloudflare tunnel cell — copy the printed URL
+Open flight_predictor.html in your browser
+Paste the URL in the API field and start predicting
 
-Machine learning project that predicts whether a flight will be delayed using XGBoost.
-
-## Features
-- Flight delay prediction
-- Flask API
-- Interactive UI
-- Trained on 100K US flight records
-
-## Technologies Used
-- Python
-- Scikit-learn
-- XGBoost
-- Flask
-- Google Colab
+Made by
+Shailendra kumar singh — Chandigarh University, 2026
