@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flight Delay Predictor</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ── reset & base ─────────────────────────────────────────── */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --bg:        #07111f;
+  --surface:   #0d1e33;
+  --surface2:  #112440;
+  --border:    #1a3050;
+  --accent:    #2563eb;
+  --accent2:   #3b82f6;
+  --bright:    #60a5fa;
+  --white:     #e8f0fe;
+  --muted:     #5b7a9a;
+  --green:     #10b981;
+  --green-bg:  #021f13;
+  --green-bdr: #065f46;
+  --red:       #ef4444;
+  --red-bg:    #1f0707;
+  --red-bdr:   #7f1d1d;
+  --font:      'Sora', sans-serif;
+  --mono:      'JetBrains Mono', monospace;
+}
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  font-family: var(--font);
+  color: var(--white);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── background grid ──────────────────────────────────────── */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(37,99,235,.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(37,99,235,.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none; z-index: 0;
+}
+
+/* ── nav ──────────────────────────────────────────────────── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: rgba(7,17,31,.85);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 40px;
+  height: 64px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.nav-logo {
+  font-size: .9rem; font-weight: 700; letter-spacing: 2px;
+  text-transform: uppercase; color: var(--bright);
+  font-family: var(--mono);
+}
+.nav-badge {
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--muted); font-family: var(--mono);
+  font-size: .7rem; padding: 4px 12px; border-radius: 20px;
+}
+
+/* ── hero ─────────────────────────────────────────────────── */
+.hero {
+  position: relative; z-index: 1;
+  padding: 140px 40px 60px;
+  text-align: center;
+}
+.hero-tag {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--bright); font-family: var(--mono);
+  font-size: .72rem; padding: 6px 16px; border-radius: 30px;
+  margin-bottom: 28px; letter-spacing: 1px;
+}
+.dot { width:7px; height:7px; border-radius:50%; background:var(--green);
+       box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+.hero h1 {
+  font-size: clamp(2.4rem, 6vw, 4.2rem);
+  font-weight: 800; line-height: 1.1;
+  letter-spacing: -2px;
+  background: linear-gradient(135deg, #fff 0%, var(--bright) 60%, #93c5fd 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  margin-bottom: 18px;
+}
+.hero p {
+  color: var(--muted); font-size: 1.05rem; max-width: 500px;
+  margin: 0 auto 16px; line-height: 1.7;
+}
+
+/* ── api bar ──────────────────────────────────────────────── */
+.api-bar {
+  position: relative; z-index: 1;
+  max-width: 680px; margin: 0 auto 50px;
+  padding: 0 40px;
+}
+.api-bar-inner {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px; padding: 20px 24px;
+  display: flex; gap: 12px; align-items: flex-end;
+}
+.api-bar .field { flex: 1; }
+.api-bar label {
+  display: block; font-size: .72rem; font-weight: 600;
+  letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 8px;
+}
+.api-bar input {
+  width: 100%; background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 14px;
+  color: var(--white); font-family: var(--mono); font-size: .82rem;
+  outline: none; transition: border-color .2s;
+}
+.api-bar input:focus { border-color: var(--accent2); }
+.api-bar input::placeholder { color: var(--muted); }
+.connect-btn {
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--bright); font-family: var(--font);
+  font-size: .82rem; font-weight: 600;
+  padding: 10px 20px; border-radius: 8px;
+  cursor: pointer; white-space: nowrap;
+  transition: all .2s;
+}
+.connect-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.connect-status { margin-top: 8px; font-size: .75rem; font-family: var(--mono); }
+.connect-status.ok  { color: var(--green); }
+.connect-status.err { color: var(--red); }
+
+/* ── main form ────────────────────────────────────────────── */
+main {
+  position: relative; z-index: 1;
+  max-width: 900px; margin: 0 auto;
+  padding: 0 40px 100px;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.form-grid.two { grid-template-columns: 1fr 1fr; }
+.span2 { grid-column: span 2; }
+
+/* ── section label ────────────────────────────────────────── */
+.section-label {
+  font-size: .7rem; font-weight: 700; letter-spacing: 2.5px;
+  text-transform: uppercase; color: var(--accent2);
+  margin: 28px 0 14px;
+  display: flex; align-items: center; gap: 10px;
+}
+.section-label::after {
+  content: ''; flex: 1; height: 1px; background: var(--border);
+}
+
+/* ── field ────────────────────────────────────────────────── */
+.field { display: flex; flex-direction: column; gap: 7px; }
+.field label {
+  font-size: .72rem; font-weight: 600; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--muted);
+}
+.field input, .field select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 14px;
+  color: var(--white); font-family: var(--font);
+  font-size: .93rem; outline: none;
+  transition: border-color .2s, background .2s;
+  width: 100%;
+}
+.field input:focus, .field select:focus {
+  border-color: var(--accent2);
+  background: var(--surface2);
+}
+.field select option { background: var(--surface); }
+.field input::placeholder { color: var(--muted); }
+.field .hint {
+  font-size: .68rem; color: var(--muted);
+  font-family: var(--mono);
+}
+
+/* ── predict button ───────────────────────────────────────── */
+.predict-wrap { margin-top: 32px; text-align: center; }
+.predict-btn {
+  display: inline-flex; align-items: center; gap: 12px;
+  background: var(--accent);
+  color: #fff; font-family: var(--font);
+  font-size: 1rem; font-weight: 700;
+  padding: 16px 48px; border-radius: 12px;
+  border: none; cursor: pointer;
+  transition: all .25s;
+  box-shadow: 0 0 32px rgba(37,99,235,.35);
+}
+.predict-btn:hover {
+  background: var(--accent2);
+  transform: translateY(-2px);
+  box-shadow: 0 0 48px rgba(59,130,246,.5);
+}
+.predict-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
+.predict-btn svg { width:20px; height:20px; }
+
+/* ── spinner ──────────────────────────────────────────────── */
+.spinner {
+  display: none; width: 32px; height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent2);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+  margin: 32px auto 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── result panel ─────────────────────────────────────────── */
+.result-panel {
+  display: none;
+  margin-top: 40px;
+  border-radius: 20px;
+  padding: 48px 40px;
+  text-align: center;
+  border: 1px solid;
+  animation: slideUp .45s cubic-bezier(.22,1,.36,1);
+}
+@keyframes slideUp {
+  from { opacity:0; transform: translateY(24px); }
+  to   { opacity:1; transform: translateY(0); }
+}
+.result-panel.on-time {
+  background: var(--green-bg);
+  border-color: var(--green-bdr);
+}
+.result-panel.delayed {
+  background: var(--red-bg);
+  border-color: var(--red-bdr);
+}
+
+.result-plane {
+  font-size: 3.5rem; margin-bottom: 16px;
+  animation: fly .6s ease;
+}
+@keyframes fly {
+  from { transform: translateX(-30px); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+
+.result-verdict {
+  font-size: 2.6rem; font-weight: 800;
+  letter-spacing: -1.5px; margin-bottom: 8px;
+}
+.on-time .result-verdict { color: var(--green); }
+.delayed  .result-verdict { color: var(--red); }
+
+.result-sub {
+  color: var(--muted); font-size: .95rem;
+  margin-bottom: 28px;
+}
+
+.conf-wrap { max-width: 360px; margin: 0 auto; }
+.conf-label {
+  display: flex; justify-content: space-between;
+  font-size: .75rem; font-family: var(--mono);
+  color: var(--muted); margin-bottom: 8px;
+}
+.conf-track {
+  background: rgba(255,255,255,.07);
+  border-radius: 8px; height: 10px; overflow: hidden;
+}
+.conf-fill {
+  height: 100%; border-radius: 8px; width: 0;
+  transition: width 1s cubic-bezier(.22,1,.36,1);
+}
+.on-time .conf-fill { background: linear-gradient(90deg, #059669, var(--green)); }
+.delayed  .conf-fill { background: linear-gradient(90deg, #b91c1c, var(--red)); }
+
+.result-details {
+  display: flex; justify-content: center; gap: 32px;
+  margin-top: 28px; flex-wrap: wrap;
+}
+.detail-chip {
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 10px; padding: 10px 20px;
+  font-size: .8rem; font-family: var(--mono); color: var(--muted);
+}
+.detail-chip span { color: var(--white); font-weight: 600; }
+
+/* ── error ────────────────────────────────────────────────── */
+.error-msg {
+  display: none; text-align: center; margin-top: 20px;
+  color: var(--red); font-size: .85rem;
+  background: var(--red-bg); border: 1px solid var(--red-bdr);
+  border-radius: 10px; padding: 14px 20px;
+}
+
+/* ── footer ───────────────────────────────────────────────── */
+footer {
+  position: relative; z-index: 1;
+  text-align: center; padding: 32px;
+  color: var(--muted); font-size: .78rem;
+  border-top: 1px solid var(--border);
+  font-family: var(--mono);
+}
+
+/* ── responsive ───────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .form-grid, .form-grid.two { grid-template-columns: 1fr; }
+  .span2 { grid-column: span 1; }
+  .hero { padding: 120px 20px 40px; }
+  main, .api-bar { padding-left: 20px; padding-right: 20px; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">✈ FlightPredict</div>
+  <div class="nav-badge">XGBoost · PyCaret · ML</div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-tag">
+    <span class="dot"></span>
+    Model Active — 82.4% Accuracy
+  </div>
+  <h1>Will Your Flight<br>Be Delayed?</h1>
+  <p>Enter your flight details below and our XGBoost model will predict the outcome in seconds.</p>
+<p style="margin-top:10px; color:var(--bright); font-size:.85rem; font-family:var(--mono);">Made by Shailendra</p>
+</div>
+
+<!-- API BAR -->
+<div class="api-bar">
+  <div class="api-bar-inner">
+    <div class="field">
+      <label>Paste your Colab ngrok URL</label>
+      <input type="text" id="apiUrl"
+             placeholder="https://xxxx-xx-xx.ngrok-free.app" />
+    </div>
+    <button class="connect-btn" onclick="testConnection()">Test Connection</button>
+  </div>
+  <div class="connect-status" id="connectStatus"></div>
+</div>
+
+<!-- FORM -->
+<main>
+
+  <div class="section-label">Flight Info</div>
+  <div class="form-grid">
+    <div class="field span2">
+      <label>Airline</label>
+      <select id="airline">
+        <option value="AA">American Airlines (AA)</option>
+        <option value="DL">Delta Airlines (DL)</option>
+        <option value="UA">United Airlines (UA)</option>
+        <option value="WN">Southwest Airlines (WN)</option>
+        <option value="B6">JetBlue Airways (B6)</option>
+        <option value="AS">Alaska Airlines (AS)</option>
+        <option value="NK">Spirit Airlines (NK)</option>
+        <option value="F9">Frontier Airlines (F9)</option>
+        <option value="OO">SkyWest Airlines (OO)</option>
+        <option value="EV">ExpressJet (EV)</option>
+        <option value="MQ">Envoy Air (MQ)</option>
+        <option value="HA">Hawaiian Airlines (HA)</option>
+        <option value="VX">Virgin America (VX)</option>
+        <option value="US">US Airways (US)</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Origin Airport (IATA)</label>
+      <input type="text" id="origin" placeholder="e.g. ATL" maxlength="5" />
+      <span class="hint">3-letter airport code</span>
+    </div>
+    <div class="field">
+      <label>Destination (IATA)</label>
+      <input type="text" id="destination" placeholder="e.g. LAX" maxlength="5" />
+      <span class="hint">3-letter airport code</span>
+    </div>
+    <div class="field">
+      <label>Distance (miles)</label>
+      <input type="number" id="distance" placeholder="e.g. 1947" min="50" max="5000" />
+    </div>
+  </div>
+
+  <div class="section-label">Schedule</div>
+  <div class="form-grid">
+    <div class="field">
+      <label>Month</label>
+      <select id="month">
+        <option value="1">January</option><option value="2">February</option>
+        <option value="3">March</option><option value="4">April</option>
+        <option value="5">May</option><option value="6">June</option>
+        <option value="7">July</option><option value="8">August</option>
+        <option value="9">September</option><option value="10">October</option>
+        <option value="11">November</option><option value="12">December</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Day of Month</label>
+      <input type="number" id="day" placeholder="e.g. 15" min="1" max="31" value="15" />
+    </div>
+    <div class="field">
+      <label>Day of Week</label>
+      <select id="day_of_week">
+        <option value="1">Monday</option><option value="2">Tuesday</option>
+        <option value="3">Wednesday</option><option value="4">Thursday</option>
+        <option value="5">Friday</option><option value="6">Saturday</option>
+        <option value="7">Sunday</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Departure Time (HHMM)</label>
+      <input type="number" id="departure_time" placeholder="e.g. 0800" value="800" />
+      <span class="hint">24hr format — 0800 = 8:00 AM</span>
+    </div>
+    <div class="field">
+      <label>Flight Duration (mins)</label>
+      <input type="number" id="flight_duration" placeholder="e.g. 180" value="180" />
+    </div>
+    <div class="field">
+      <label>Arrival Time (HHMM)</label>
+      <input type="number" id="arrival_time" placeholder="e.g. 1100" value="1100" />
+      <span class="hint">24hr format — 1400 = 2:00 PM</span>
+    </div>
+  </div>
+
+  <!-- PREDICT BUTTON -->
+  <div class="predict-wrap">
+    <button class="predict-btn" id="predictBtn" onclick="predict()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+      </svg>
+      Predict Now
+    </button>
+  </div>
+
+  <div class="spinner" id="spinner"></div>
+  <div class="error-msg" id="errorMsg"></div>
+
+  <!-- RESULT -->
+  <div class="result-panel" id="resultPanel">
+    <div class="result-plane" id="resultPlane"></div>
+    <div class="result-verdict" id="resultVerdict"></div>
+    <div class="result-sub" id="resultSub"></div>
+    <div class="conf-wrap">
+      <div class="conf-label">
+        <span>Confidence</span>
+        <span id="confPct"></span>
+      </div>
+      <div class="conf-track">
+        <div class="conf-fill" id="confFill"></div>
+      </div>
+    </div>
+    <div class="result-details" id="resultDetails"></div>
+  </div>
+
+</main>
+
+<footer>
+  Flight Delay Predictor · XGBoost · PyCaret · Chandigarh University · 2026
+</footer>
+
+<script>
+// ── test connection ────────────────────────────────────────
+async function testConnection() {
+  const url    = getUrl();
+  const status = document.getElementById('connectStatus');
+  if (!url) { status.textContent = '⚠ Please paste your ngrok URL first'; status.className = 'connect-status err'; return; }
+  status.textContent = 'Connecting...'; status.className = 'connect-status';
+  try {
+    const r = await fetch(`${url}/health`);
+    if (r.ok) {
+      status.textContent = '✓ Connected — model is ready!';
+      status.className = 'connect-status ok';
+    } else throw new Error();
+  } catch {
+    status.textContent = '✗ Could not connect. Check URL and make sure Colab is running.';
+    status.className = 'connect-status err';
+  }
+}
+
+function getUrl() {
+  return document.getElementById('apiUrl').value.trim().replace(/\/$/, '');
+}
+
+// ── predict ────────────────────────────────────────────────
+async function predict() {
+  const url = getUrl();
+  const btn = document.getElementById('predictBtn');
+  const spinner = document.getElementById('spinner');
+  const panel   = document.getElementById('resultPanel');
+  const errMsg  = document.getElementById('errorMsg');
+
+  // validate
+  const origin = document.getElementById('origin').value.trim().toUpperCase();
+  const dest   = document.getElementById('destination').value.trim().toUpperCase();
+  const dist   = document.getElementById('distance').value;
+
+  if (!url)    { showError('Please paste your Colab ngrok URL at the top!'); return; }
+  if (!origin || origin.length < 2) { showError('Please enter a valid origin airport code (e.g. ATL)'); return; }
+  if (!dest   || dest.length < 2)   { showError('Please enter a valid destination airport code (e.g. LAX)'); return; }
+  if (!dist)   { showError('Please enter the flight distance in miles'); return; }
+
+  btn.disabled = true;
+  spinner.style.display = 'block';
+  panel.style.display   = 'none';
+  errMsg.style.display  = 'none';
+
+  const payload = {
+    month:           document.getElementById('month').value,
+    day:             document.getElementById('day').value,
+    day_of_week:     document.getElementById('day_of_week').value,
+    airline:         document.getElementById('airline').value,
+    origin, destination: dest,
+    departure_time:  document.getElementById('departure_time').value,
+    flight_duration: document.getElementById('flight_duration').value,
+    distance:        dist,
+    arrival_time:    document.getElementById('arrival_time').value,
+  };
+
+  try {
+    const res  = await fetch(`${url}/predict`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error('Server error');
+    const data = await res.json();
+    showResult(data, payload);
+  } catch(e) {
+    showError('Could not connect to the model server. Make sure Colab is running and the URL is correct.');
+  } finally {
+    btn.disabled = false;
+    spinner.style.display = 'none';
+  }
+}
+
+// ── show result ────────────────────────────────────────────
+function showResult(data, payload) {
+  const panel   = document.getElementById('resultPanel');
+  const isDelay = data.delayed;
+
+  panel.className = `result-panel ${isDelay ? 'delayed' : 'on-time'}`;
+  document.getElementById('resultPlane').textContent   = isDelay ? '✈️' : '✈️';
+  document.getElementById('resultVerdict').textContent = isDelay ? '⚠️  Likely Delayed' : '✅  Likely On Time';
+  document.getElementById('resultSub').textContent     = isDelay
+    ? 'This flight has a higher chance of arriving more than 15 minutes late.'
+    : 'This flight is predicted to arrive on schedule or early.';
+
+  document.getElementById('confPct').textContent = `${data.confidence}%`;
+  setTimeout(() => {
+    document.getElementById('confFill').style.width = `${data.confidence}%`;
+  }, 100);
+
+  // detail chips
+  const monthNames = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('resultDetails').innerHTML = `
+    <div class="detail-chip">Route <span>${payload.origin} → ${payload.destination}</span></div>
+    <div class="detail-chip">Airline <span>${payload.airline}</span></div>
+    <div class="detail-chip">Date <span>${monthNames[payload.month]} ${payload.day}</span></div>
+    <div class="detail-chip">Confidence <span>${data.confidence}%</span></div>
+  `;
+
+  panel.style.display = 'block';
+  panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function showError(msg) {
+  const e = document.getElementById('errorMsg');
+  e.textContent   = '⚠ ' + msg;
+  e.style.display = 'block';
+}
+</script>
+</body>
+</html>
